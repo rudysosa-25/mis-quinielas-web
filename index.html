@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a2332">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quinielas">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Mis Quinielas</title>
+<style>
+  :root {
+    --bg: #0f1722; --card: #1a2332; --card2: #223046; --text: #eef2f7;
+    --muted: #8fa1b8; --accent: #4caf50; --accent2: #2e7d32;
+    --danger: #e05252; --border: #2c3b52;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100dvh; padding: 16px; padding-bottom: 96px;
+  }
+  h1 { font-size: 1.4rem; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: .85rem; margin-bottom: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  label { display: block; font-size: .8rem; color: var(--muted); margin: 10px 0 4px; }
+  select, input {
+    width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card2); color: var(--text); font-size: 1rem;
+  }
+  .numrow { display: flex; gap: 8px; }
+  .numrow input { width: 100%; text-align: center; font-size: 1.1rem; padding: 12px 4px; }
+  .btn {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    background: var(--accent); color: #fff; font-size: 1rem; font-weight: 600;
+    margin-top: 14px; cursor: pointer;
+  }
+  .btn.secondary { background: var(--card2); border: 1px solid var(--border); color: var(--text); }
+  .btn.danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  .ticket {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; margin-bottom: 10px; display: flex; justify-content: space-between;
+    align-items: center; gap: 12px;
+  }
+  .ticket .nums { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .ball {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--accent2);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem;
+  }
+  .game-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: .72rem;
+    font-weight: 700; letter-spacing: .3px;
+  }
+  .badge-quini6 { background: #2e7d32; } .badge-loto { background: #1565c0; }
+  .ticket-actions { display: flex; flex-direction: column; gap: 8px; }
+  .ticket-actions button { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card2); color: var(--text); cursor: pointer; font-size: .85rem; }
+  .ticket-actions .del { border-color: var(--danger); color: var(--danger); }
+  .floating {
+    position: fixed; bottom: 20px; left: 16px; right: 16px;
+  }
+  .floating button { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--accent); color: #fff; font-size: 1.05rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+  .status { font-size: .8rem; color: var(--muted); text-align: center; margin-top: 8px; min-height: 1.2em; }
+  .status.err { color: var(--danger); }
+  .hidden { display: none; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .settings-link { background: none; border: none; color: var(--muted); font-size: 1.3rem; cursor: pointer; padding: 4px; }
+  dialog { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 14px; padding: 20px; width: min(420px, 92vw); }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+</style>
+</head>
+<body>
+  <!-- ====== Setup screen (first run) ====== -->
+  <div id="setup" class="hidden">
+    <h1>🎰 Mis Quinielas</h1>
+    <p class="subtitle">Configuración inicial (una sola vez)</p>
+    <div class="card">
+      <label>Token de GitHub (github_pat_... o ghp_...)</label>
+      <input id="inp-token" type="password" placeholder="Pegá acá tu token" autocomplete="off">
+      <label>Repositorio</label>
+      <input id="inp-repo" type="text" value="rudysosa-25/mis-quinielas">
+      <button class="btn" onclick="App.saveSetup()">Guardar</button>
+      <p class="status" id="setup-status"></p>
+    </div>
+    <p style="color:var(--muted);font-size:.8rem">
+      El token queda guardado solo en este navegador y se usa para guardar tus números en tu repo privado.
+    </p>
+  </div>
+
+  <!-- ====== Main screen ====== -->
+  <div id="main" class="hidden">
+    <div class="header-row">
+      <div>
+        <h1>🎰 Mis Quinielas</h1>
+        <p class="subtitle" id="next-draw"></p>
+      </div>
+      <button class="settings-link" onclick="App.openSettings()" title="Configuración">⚙️</button>
+    </div>
+
+    <div id="last-draws"></div>
+
+    <div id="list"></div>
+
+    <div class="floating"><button onclick="App.showForm()">＋ Cargar boleta</button></div>
+  </div>
+
+  <!-- ====== Ticket form (dialog) ====== -->
+  <dialog id="form">
+    <h2 style="margin-bottom:8px" id="form-title">Nueva boleta</h2>
+    <label>Juego</label>
+    <select id="f-game">
+      <option value="quini6">Quini 6</option>
+      <option value="loto">Loto Plus</option>
+    </select>
+    <label>Números (00 a 45)</label>
+    <div class="numrow">
+      <input id="f-n0" maxlength="2" inputmode="numeric">
+      <input id="f-n1" maxlength="2" inputmode="numeric">
+      <input id="f-n2" maxlength="2" inputmode="numeric">
+      <input id="f-n3" maxlength="2" inputmode="numeric">
+      <input id="f-n4" maxlength="2" inputmode="numeric">
+      <input id="f-n5" maxlength="2" inputmode="numeric">
+    </div>
+    <label>Fecha de la boleta</label>
+    <input id="f-date" type="date">
+    <button class="btn" onclick="App.saveTicket()">Guardar</button>
+    <button class="btn secondary" onclick="document.getElementById('form').close()">Cancelar</button>
+    <p class="status" id="form-status"></p>
+  </dialog>
+
+  <!-- ====== Settings (dialog) ====== -->
+  <dialog id="settings">
+    <h2 style="margin-bottom:8px">Configuración</h2>
+    <label>Token de GitHub</label>
+    <input id="s-token" type="password" autocomplete="off">
+    <label>Repositorio</label>
+    <input id="s-repo" type="text">
+    <button class="btn" onclick="App.saveSetup()">Guardar</button>
+    <button class="btn danger" onclick="App.forget()">Borrar configuración</button>
+    <button class="btn secondary" onclick="document.getElementById('settings').close()">Cerrar</button>
+    <p class="status" id="setup-status2"></p>
+  </dialog>
+
+<script>
+const API = 'https://api.github.com';
+const LS_KEY = 'mq_config';
+
+const App = {
+  cfg: null,
+  tickets: [],
+  editingIndex: null,
+
+  async init() {
+    const raw = localStorage.getItem(LS_KEY);
+    this.cfg = raw ? JSON.parse(raw) : null;
+    if (!this.cfg || !this.cfg.token) {
+      this.show('setup');
+      return;
+    }
+    this.show('main');
+    await this.load();
+    this.renderNextDraw();
+  },
+
+  show(which) {
+    document.getElementById('setup').classList.toggle('hidden', which !== 'setup');
+    document.getElementById('main').classList.toggle('hidden', which !== 'main');
+  },
+
+  status(id, msg, isErr = false) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.toggle('err', isErr);
+  },
+
+  async saveSetup() {
+    const token = document.getElementById('s-token').value.trim() || document.getElementById('inp-token').value.trim();
+    const repo = document.getElementById('s-repo').value.trim() || document.getElementById('inp-repo').value.trim();
+    if (!token || !repo.includes('/')) {
+      this.status('setup-status', 'Token o repositorio inválido.', true);
+      return;
+    }
+    this.cfg = { token, repo };
+    localStorage.setItem(LS_KEY, JSON.stringify(this.cfg));
+    this.status('setup-status', '✓ Configuración guardada');
+    this.status('setup-status2', '✓ Configuración guardada');
+    document.getElementById('settings').close();
+    this.show('main');
+    await this.load();
+    this.renderNextDraw();
+    await this.renderLastDraws();
+  },
+
+  async renderLastDraws() {
+    const el = document.getElementById('last-draws');
+    const games = [
+      { file: 'results/quini6_latest.json', label: 'Quini 6', cls: 'badge-quini6' },
+      { file: 'results/loto_latest.json', label: 'Loto', cls: 'badge-loto' },
+    ];
+    let html = '';
+    for (const g of games) {
+      try {
+        const res = await fetch(`${API}/repos/${this.cfg.repo}/contents/${g.file}`, { headers: this.headers() });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const content = new TextDecoder().decode(Uint8Array.from(atob(data.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
+        const r = JSON.parse(content);
+        const mods = Object.entries(r.modalities).map(([name, balls]) => `
+          <div style="margin-top:8px">
+            <small style="color:var(--muted)">${name.replace('_',' ').toUpperCase()}</small>
+            <div class="nums" style="margin-top:4px">${balls.map(n => `<div class="ball" style="background:var(--card2)">${n}</div>`).join('')}</div>
+          </div>`).join('');
+        html += `
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="game-badge ${g.cls}">${g.label.toUpperCase()}</span>
+              <small style="color:var(--muted)">Sorteo ${r.draw_id} · ${r.date_raw}</small>
+            </div>
+            ${mods}
+          </div>`;
+      } catch (e) { /* results not available yet */ }
+    }
+    if (html) el.innerHTML = '<h2 style="font-size:1rem;margin:8px 0 10px">🎱 Última jugada</h2>' + html;
+  },
+
+  forget() {
+    localStorage.removeItem(LS_KEY);
+    this.cfg = null;
+    document.getElementById('settings').close();
+    this.show('setup');
+  },
+
+  openSettings() {
+    document.getElementById('s-repo').value = this.cfg?.repo || 'rudysosa-25/mis-quinielas';
+    document.getElementById('s-token').value = '';
+    document.getElementById('settings').showModal();
+  },
+
+  renderNextDraw() {
+    const days = { 3: 'Quini 6 y Loto', 6: 'Loto', 0: 'Quini 6' }; // JS day: 3=Wed, 6=Sat, 0=Sun
+    const now = new Date();
+    const d = now.getDay();
+    const el = document.getElementById('next-draw');
+    if (days[d] !== undefined) {
+      el.textContent = `Hoy hay sorteo: ${days[d]} 🍀`;
+    } else {
+      const names = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+      let next = (d < 3) ? 3 : (d < 6 ? 6 : 0);
+      const diff = (next - d + 7) % 7 || 7;
+      el.textContent = `Próximo sorteo: ${names[next]} (Quini 6 y/o Loto)`;
+    }
+  },
+
+  headers() {
+    return {
+      'Authorization': `Bearer ${this.cfg.token}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+  },
+
+  async load() {
+    this.status('setup-status', 'Cargando...');
+    try {
+      const res = await fetch(`${API}/repos/${this.cfg.repo}/contents/tickets.json`, { headers: this.headers() });
+      if (res.status === 404) {
+        this.tickets = [];
+      } else if (!res.ok) {
+        throw new Error(`GitHub API: ${res.status} (¿token vencido?)`);
+      } else {
+        const data = await res.json();
+        const content = new TextDecoder().decode(Uint8Array.from(atob(data.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
+        this.tickets = JSON.parse(content);
+      }
+      this.render();
+    } catch (e) {
+      this.status('setup-status', 'Error: ' + e.message, true);
+      this.render();
+    }
+  },
+
+  async persist() {
+    const body = {
+      message: `update tickets (${this.tickets.length})`,
+      content: btoa(new TextEncoder().encode(JSON.stringify(this.tickets, null, 2)).reduce((s, b) => s + String.fromCharCode(b), '')),
+    };
+    // include sha if the file exists
+    const res = await fetch(`${API}/repos/${this.cfg.repo}/contents/tickets.json`, { headers: this.headers() });
+    if (res.ok) body.sha = (await res.json()).sha;
+    const put = await fetch(`${API}/repos/${this.cfg.repo}/contents/tickets.json`, {
+      method: 'PUT', headers: this.headers(), body: JSON.stringify(body),
+    });
+    if (!put.ok) throw new Error(`No se pudo guardar: ${put.status}`);
+  },
+
+  render() {
+    const list = document.getElementById('list');
+    if (!this.tickets.length) {
+      list.innerHTML = '<div class="empty">Todavía no cargaste boletas.<br>Tocá el botón de abajo 👇</div>';
+      return;
+    }
+    list.innerHTML = this.tickets.map((t, i) => `
+      <div class="ticket">
+        <div>
+          <span class="game-badge badge-${t.game}">${t.game === 'quini6' ? 'QUINI 6' : 'LOTO'}</span>
+          <small style="color:var(--muted);margin-left:8px">${t.date}</small>
+          <div class="nums">${t.numbers.map(n => `<div class="ball">${n}</div>`).join('')}</div>
+        </div>
+        <div class="ticket-actions">
+          <button onclick="App.showForm(${i})">✏️ Editar</button>
+          <button class="del" onclick="App.deleteTicket(${i})">🗑</button>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  showForm(editIndex = null) {
+    this.editingIndex = editIndex;
+    const t = editIndex !== null ? this.tickets[editIndex] : null;
+    document.getElementById('form-title').textContent = t ? 'Editar boleta' : 'Nueva boleta';
+    document.getElementById('f-game').value = t?.game || 'quini6';
+    for (let i = 0; i < 6; i++) document.getElementById('f-n' + i).value = t?.numbers?.[i] ?? '';
+    document.getElementById('f-date').value = t?.date || new Date().toISOString().slice(0, 10);
+    this.status('form-status', '');
+    document.getElementById('form').showModal();
+  },
+
+  async saveTicket() {
+    const game = document.getElementById('f-game').value;
+    const numbers = [];
+    for (let i = 0; i < 6; i++) {
+      const v = document.getElementById('f-n' + i).value.trim();
+      const n = parseInt(v, 10);
+      if (v === '' || isNaN(n) || n < 0 || n > 45) {
+        this.status('form-status', 'Revisá los 6 números (00 a 45).', true);
+        return;
+      }
+      numbers.push(String(n).padStart(2, '0'));
+    }
+    if (new Set(numbers).size !== 6) {
+      this.status('form-status', 'No puede haber números repetidos.', true);
+      return;
+    }
+    const date = document.getElementById('f-date').value;
+    if (!date) { this.status('form-status', 'Falta la fecha.', true); return; }
+
+    const ticket = { game, numbers, date, created: new Date().toISOString() };
+    if (this.editingIndex !== null) {
+      ticket.checked = this.tickets[this.editingIndex].checked ?? null;
+      this.tickets[this.editingIndex] = ticket;
+    } else {
+      this.tickets.push(ticket);
+    }
+    try {
+      this.status('form-status', 'Guardando...');
+      await this.persist();
+      document.getElementById('form').close();
+      this.render();
+    } catch (e) {
+      this.status('form-status', e.message, true);
+    }
+  },
+
+  async deleteTicket(i) {
+    if (!confirm('¿Borrar esta boleta?')) return;
+    this.tickets.splice(i, 1);
+    try {
+      await this.persist();
+      this.render();
+    } catch (e) {
+      this.status('setup-status', e.message, true);
+    }
+  },
+};
+
+App.init();
+</script>
+</body>
+</html>
