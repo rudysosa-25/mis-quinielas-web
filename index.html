@@ -65,6 +65,31 @@
   }
   .floating button { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--accent); color: #fff; font-size: 1.05rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
   .empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+  /* ===== Last-draw cards ===== */
+  .draw-card {
+    background: linear-gradient(160deg, #223046 0%, #1a2332 55%, #16202e 100%);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 16px 16px 14px; margin-bottom: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.35);
+    overflow: hidden;
+  }
+  .draw-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .draw-logo { height: 34px; max-width: 55%; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+  .pozo-pill {
+    display: inline-block; margin-top: 10px; padding: 6px 12px; border-radius: 999px;
+    background: rgba(76,175,80,.15); border: 1px solid rgba(76,175,80,.4);
+    color: #a5d6a7; font-size: .78rem;
+  }
+  .mod-block { margin-top: 12px; }
+  .mod-name { color: var(--muted); font-size: .7rem; letter-spacing: 1.2px; font-weight: 700; }
+  .draw-nums { display: flex; gap: 8px; overflow-x: auto; padding: 8px 2px 4px; scrollbar-width: none; }
+  .draw-nums::-webkit-scrollbar { display: none; }
+  .draw-ball {
+    flex: 0 0 auto; width: 44px; height: 44px; font-size: 1.05rem;
+    background: radial-gradient(circle at 32% 30%, #6fdc73, #2e7d32 70%);
+    box-shadow: inset 0 -3px 6px rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.4);
+    border: 2px solid rgba(255,255,255,.15);
+  }
   .status { font-size: .8rem; color: var(--muted); text-align: center; margin-top: 8px; min-height: 1.2em; }
   .status.err { color: var(--danger); }
   .hidden { display: none; }
@@ -201,8 +226,8 @@ const App = {
   async renderLastDraws() {
     const el = document.getElementById('last-draws');
     const games = [
-      { file: 'results/quini6_latest.json', label: 'Quini 6', cls: 'badge-quini6' },
-      { file: 'results/loto_latest.json', label: 'Loto', cls: 'badge-loto' },
+      { file: 'results/quini6_latest.json', label: 'Quini 6', logo: 'quini6-logo.png' },
+      { file: 'results/loto_latest.json', label: 'Loto', logo: 'loto-logo.png' },
     ];
     let html = '';
     for (const g of games) {
@@ -212,17 +237,20 @@ const App = {
         const data = await res.json();
         const content = new TextDecoder().decode(Uint8Array.from(atob(data.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
         const r = JSON.parse(content);
-        const pozo = r.pozo ? `<div style="margin-top:8px;font-size:.9rem">💰 Pozo próximo sorteo: <b>${r.pozo}</b></div>` : '';
+        const pozo = r.pozo ? `<div class="pozo-pill">💰 Pozo próximo sorteo: <b>${r.pozo}</b></div>` : '';
         const mods = Object.entries(r.modalities).map(([name, balls]) => `
-          <div style="margin-top:8px">
-            <small style="color:var(--muted)">${name.replace('_',' ').toUpperCase()}</small>
-            <div class="nums" style="margin-top:4px">${balls.map(n => `<div class="ball" style="background:var(--card2)">${n}</div>`).join('')}</div>
+          <div class="mod-block">
+            <small class="mod-name">${name.replace('_',' ').toUpperCase()}</small>
+            <div class="nums draw-nums">${balls.map(n => `<div class="ball draw-ball">${n}</div>`).join('')}</div>
           </div>`).join('');
         html += `
-          <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <span class="game-badge ${g.cls}">${g.label.toUpperCase()}</span>
-              <small style="color:var(--muted)">Sorteo ${r.draw_id} · ${r.date_raw}</small>
+          <div class="draw-card">
+            <div class="draw-header">
+              <img class="draw-logo" src="${g.logo}" alt="${g.label}">
+              <div style="text-align:right">
+                <small style="color:var(--muted);display:block">Sorteo ${r.draw_id}</small>
+                <small style="color:var(--muted);opacity:.7">${r.date_raw}</small>
+              </div>
             </div>
             ${pozo}
             ${mods}
