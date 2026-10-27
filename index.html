@@ -103,6 +103,8 @@
     </div>
 
     <div id="last-draws"></div>
+    <h2 style="font-size:1rem;margin:8px 0 10px">🔍 Tu chequeo</h2>
+    <div id="my-check" class="card"><span style="color:var(--muted)">Cargando chequeo...</span></div>
 
     <div id="list"></div>
 
@@ -210,6 +212,7 @@ const App = {
         const data = await res.json();
         const content = new TextDecoder().decode(Uint8Array.from(atob(data.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
         const r = JSON.parse(content);
+        const pozo = r.pozo ? `<div style="margin-top:8px;font-size:.9rem">💰 Pozo próximo sorteo: <b>${r.pozo}</b></div>` : '';
         const mods = Object.entries(r.modalities).map(([name, balls]) => `
           <div style="margin-top:8px">
             <small style="color:var(--muted)">${name.replace('_',' ').toUpperCase()}</small>
@@ -221,11 +224,57 @@ const App = {
               <span class="game-badge ${g.cls}">${g.label.toUpperCase()}</span>
               <small style="color:var(--muted)">Sorteo ${r.draw_id} · ${r.date_raw}</small>
             </div>
+            ${pozo}
             ${mods}
           </div>`;
       } catch (e) { /* results not available yet */ }
     }
     if (html) el.innerHTML = '<h2 style="font-size:1rem;margin:8px 0 10px">🎱 Última jugada</h2>' + html;
+    await this.renderMyCheck();
+  },
+
+  async renderMyCheck() {
+    const el = document.getElementById('my-check');
+    let check = null;
+    try {
+      const res = await fetch(`${API}/repos/${this.cfg.repo}/contents/results/last_check.json`, { headers: this.headers() });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const content = new TextDecoder().decode(Uint8Array.from(atob(data.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
+      check = JSON.parse(content);
+    } catch (e) {
+      el.innerHTML = '<span style="color:var(--muted)">Todavía no hay chequeos. El sistema chequea solo después de cada sorteo.</span>';
+      return;
+    }
+
+    const money = v => {
+      const n = parseFloat(v);
+      return '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    let html = '';
+    let anyPrize = false;
+    for (const [game, g] of Object.entries(check.games || {})) {
+      const label = game === 'quini6' ? 'Quini 6' : 'Loto';
+      const pozo = g.pozo ? ` · Pozo: <b>${g.pozo}</b>` : '';
+      html += `<div style="margin-top:6px"><span class="game-badge badge-${game}">${label.toUpperCase()}</span>
+        <small style="color:var(--muted)"> Sorteo ${g.draw_id} · ${g.date_raw}${pozo}</small></div>`;
+      for (const t of g.tickets || []) {
+        const lines = (t.results || []).map(r =>
+          `<div style="margin:4px 0 0 8px">• ${r.modality.replace('_',' ').toUpperCase()}: ${r.aciertos} aciertos${r.prize ? ` → 🎉 <b>${r.prize}</b>` : ''}</div>`
+        ).join('');
+        const total = parseFloat(t.total_prize || 0);
+        if (total > 0) {
+          anyPrize = true;
+          html += `<div style="margin:6px 0 0 8px"><div class="nums">${t.numbers.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem">${n}</div>`).join('')}</div>
+            <div style="margin-top:6px;color:var(--accent);font-weight:700">💰 PREMIO: ${money(t.total_prize)}</div></div>${lines}`;
+        } else {
+          html += `<div style="margin:6px 0 0 8px"><div class="nums">${t.numbers.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem;background:var(--card2)">${n}</div>`).join('')}</div>
+            <div style="margin:4px 0 0 8px;color:var(--muted)">Sin premio esta vez 🍀</div></div>${lines}`;
+        }
+      }
+    }
+    el.innerHTML = html || '<span style="color:var(--muted)">No tenés boletas para chequear.</span>';
   },
 
   forget() {
