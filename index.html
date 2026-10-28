@@ -182,6 +182,7 @@
       <label>Cartón Telekino — marcá 15 números (01 a 25)</label>
       <div class="num-grid" id="f-tk-grid"></div>
       <label style="margin-top:12px">Rekino (opcional, si tu boleta lo trae)</label>
+      <button class="btn secondary" style="margin-top:6px;padding:10px" onclick="App.replicateRekino()">📋 Replicar en Rekino los mismos números del cartón</button>
       <div class="num-grid" id="f-tk-rekino-grid"></div>
       <p class="status" style="text-align:left">Se chequea automáticamente el próximo domingo <b id="f-tk-date"></b> y después queda caducada.</p>
     </div>
@@ -487,6 +488,16 @@ const App = {
     document.getElementById('f-tk').classList.toggle('hidden', !isTk);
     document.getElementById('f-date-row').classList.toggle('hidden', isTk);
     document.getElementById('f-save-another').classList.toggle('hidden', !isTk);
+  },
+
+  replicateRekino() {
+    if (this.tkSel.length !== 15) {
+      this.status('form-status', 'Primero marcá los 15 números del cartón.', true);
+      return;
+    }
+    this.tkRekinoSel = this.tkSel.slice();
+    this.buildGrid('f-tk-rekino-grid', this.tkRekinoSel);
+    this.status('form-status', '✓ Rekino replicado con los mismos números.');
   },
 
   showForm(editIndex = null) {
