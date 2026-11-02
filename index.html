@@ -333,23 +333,32 @@ const App = {
 
     let html = '';
     let anyPrize = false;
+    const fmtWhen = iso => {
+      const d = new Date(iso);
+      return isNaN(d) ? (iso || '')
+        : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' +
+          d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+    };
     for (const [game, g] of Object.entries(check.games || {})) {
       const label = game === 'quini6' ? 'Quini 6' : game === 'loto' ? 'Loto' : 'Telekino';
       const pozo = g.pozo ? ` · Pozo: <b>${g.pozo}</b>` : '';
+      const when = fmtWhen(g.checked_at || check.checked_at);
       html += `<div style="margin-top:6px"><span class="game-badge badge-${game}">${label.toUpperCase()}</span>
-        <small style="color:var(--muted)"> Sorteo ${g.draw_id} · ${g.date_raw}${pozo}</small></div>`;
+        <small style="color:var(--muted)"> Sorteo ${g.draw_id} · ${g.date_raw}${pozo}</small>
+        <small style="color:var(--muted);display:block;opacity:.75">🕐 Chequeado: ${when}</small></div>`;
       for (const t of g.tickets || []) {
         const lines = (t.results || []).map(r =>
-          `<div style="margin:4px 0 0 8px">• ${r.modality.replace('_',' ').toUpperCase()}: ${r.aciertos} aciertos${r.prize ? ` → 🎉 <b>${r.prize}</b>` : ''}</div>`
+          `<div style="margin:4px 0 0 8px">• ${r.modality.replace('_',' ').toUpperCase()}: ${r.aciertos} aciertos${r.prize ? ` → 🎉 <b>${r.prize}</b>` : ' — sin premio'}</div>`
         ).join('');
         const total = parseFloat(t.total_prize || 0);
         if (total > 0) {
           anyPrize = true;
-          html += `<div style="margin:6px 0 0 8px"><div class="nums">${t.numbers.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem">${n}</div>`).join('')}</div>
+          html += `<div style="margin:6px 0 0 8px"><div class="nums">${t.numbers.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem">${n}</div>`).join('')}${(t.rekino || []).length ? '<div style="color:var(--muted);font-size:.7rem">Rekino</div>' + t.rekino.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem;background:#7b5cd6">${n}</div>`).join('') : ''}</div>
             <div style="margin-top:6px;color:var(--accent);font-weight:700">💰 PREMIO: ${money(t.total_prize)}</div></div>${lines}`;
         } else {
-          html += `<div style="margin:6px 0 0 8px"><div class="nums">${t.numbers.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem;background:var(--card2)">${n}</div>`).join('')}</div>
-            <div style="margin:4px 0 0 8px;color:var(--muted)">Sin premio esta vez 🍀</div></div>${lines}`;
+          const best = Math.max(0, ...(t.results || []).map(r => r.aciertos || 0));
+          html += `<div style="margin:6px 0 0 8px"><div class="nums">${t.numbers.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem;background:var(--card2)">${n}</div>`).join('')}${(t.rekino || []).length ? '<div style="color:var(--muted);font-size:.7rem">Rekino</div>' + t.rekino.map(n => `<div class="ball" style="width:28px;height:28px;font-size:.75rem;background:#7b5cd6">${n}</div>`).join('') : ''}</div>
+            <div style="margin:4px 0 0 8px;color:var(--muted)">Sin premio esta vez 🍀 (máx. ${best} aciertos)</div></div>${lines}`;
         }
       }
     }
