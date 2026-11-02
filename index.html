@@ -312,6 +312,14 @@ const App = {
     await this.renderMyCheck();
   },
 
+  tkDateIso(raw) {
+    const MESES = {enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12};
+    const m = /(\d{1,2})\s+([A-Za-záéíóú]+)\s+(\d{4})/.exec(raw || '');
+    if (!m) return null;
+    const mes = MESES[m[2].toLowerCase()] || MESES[m[2].toLowerCase().slice(0, 10)];
+    return mes ? `${m[3]}-${String(mes).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}` : null;
+  },
+
   async renderMyCheck() {
     const el = document.getElementById('my-check');
     let check = null;
@@ -325,6 +333,8 @@ const App = {
       el.innerHTML = '<span style="color:var(--muted)">Todavía no hay chequeos. El sistema chequea solo después de cada sorteo.</span>';
       return;
     }
+    // latest checked telekino draw drives the "caducada" mark in the ticket list
+    this.lastTkChecked = this.tkDateIso(check.games?.telekino?.date_raw || null);
 
     const money = v => {
       const n = parseFloat(v);
@@ -363,6 +373,8 @@ const App = {
       }
     }
     el.innerHTML = html || '<span style="color:var(--muted)">No tenés boletas para chequear.</span>';
+    // refresh ticket list with the up-to-date caducada marks
+    this.render();
   },
 
   forget() {
@@ -441,10 +453,10 @@ const App = {
       list.innerHTML = '<div class="empty">Todavía no cargaste boletas.<br>Tocá el botón de abajo 👇</div>';
       return;
     }
-    const today = new Date().toISOString().slice(0, 10);
+    const lastTk = this.lastTkChecked || null; // ISO date of the latest checked telekino draw
     list.innerHTML = this.tickets.map((t, i) => {
       const badge = t.game === 'quini6' ? 'QUINI 6' : t.game === 'loto' ? 'LOTO' : 'TELEKINO';
-      const expired = t.game === 'telekino' && t.date < today
+      const expired = t.game === 'telekino' && lastTk && t.date <= lastTk
         ? '<small style="color:var(--danger);margin-left:8px">caducada</small>' : '';
       const nums = t.numbers.map(n => `<div class="ball">${n}</div>`).join('');
       const rekino = t.rekino?.length
