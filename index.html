@@ -341,17 +341,25 @@ const App = {
     this.refreshStatus('');
     try {
       const before = await this.fetchCheckedAt();
-      const res = await fetch(`${API}/repos/${this.cfg.repo}/actions/workflows/check.yml/dispatches`, {
-        method: 'POST',
-        headers: { ...this.headers(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: 'main', inputs: { force: 'true' } }),
+      // A contents-only token cannot dispatch workflows, so we request the check
+      // by committing force_check.json (the workflow triggers on that path).
+      const path = 'force_check.json';
+      const body = {
+        message: 'chore: request a fresh check',
+        content: btoa(JSON.stringify({ requested_at: new Date().toISOString() })),
+        branch: 'main',
+      };
+      const cur = await fetch(`${API}/repos/${this.cfg.repo}/contents/${path}?t=${Date.now()}`, { headers: this.headers() });
+      if (cur.ok) body.sha = (await cur.json()).sha;
+      const put = await fetch(`${API}/repos/${this.cfg.repo}/contents/${path}`, {
+        method: 'PUT', headers: { ...this.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      if (res.status === 403 || res.status === 404) {
-        this.refreshStatus('Tu token no puede disparar Actions. Necesita scope "workflow" (classic) o "Actions: read/write" (fine-grained).', true);
+      if (put.status === 403 || put.status === 404) {
+        this.refreshStatus('Tu token no puede escribir en el repo (necesita Contents: read/write).', true);
         return;
       }
-      if (res.status !== 204) throw new Error(`HTTP ${res.status}`);
-      this.refreshStatus('Workflow lanzado, esperando resultados…');
+      if (!put.ok) throw new Error(`GitHub API ${put.status}`);
+      this.refreshStatus('Chequeo solicitado, esperando resultados…');
       for (let i = 0; i < 24; i++) {
         await new Promise(r => setTimeout(r, 8000));
         const now = await this.fetchCheckedAt();
