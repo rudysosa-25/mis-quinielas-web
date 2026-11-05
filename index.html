@@ -276,7 +276,8 @@ const App = {
         const data = await res.json();
         const content = new TextDecoder().decode(Uint8Array.from(atob(data.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
         const r = JSON.parse(content);
-        const pozo = r.pozo ? `<div class="pozo-pill">💰 Pozo próximo sorteo: <b>${r.pozo}</b></div>` : '';
+        const pozoLabel = r.next_draw ? `Pozo próximo sorteo (${r.next_draw})` : 'Pozo del sorteo';
+        const pozo = r.pozo ? `<div class="pozo-pill">💰 ${pozoLabel}: <b>${r.pozo}</b></div>` : '';
         const mods = Object.entries(r.modalities).map(([name, balls]) => `
           <div class="mod-block">
             <small class="mod-name">${name.replace('_',' ').toUpperCase()}</small>
@@ -308,8 +309,64 @@ const App = {
           </div>`;
       } catch (e) { /* results not available yet */ }
     }
-    if (html) el.innerHTML = '<h2 style="font-size:1rem;margin:8px 0 10px">🎱 Última jugada</h2>' + html;
+    el.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin:8px 0 10px">
+        <h2 style="font-size:1rem;margin:0">🎱 Última jugada</h2>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <button class="btn secondary" id="btn-refresh" style="width:auto;margin:0;padding:8px 12px;font-size:.82rem" onclick="App.refresh()">🔄 Actualizar</button>
+          <small id="refresh-status" style="font-size:.7rem;color:var(--muted);text-align:right"></small>
+        </div>
+      </div>` + (html || '<div class="card" style="color:var(--muted)">Todavía no hay resultados cargados.</div>');
     await this.renderMyCheck();
+  },
+
+  async fetchCheckedAt() {
+    try {
+      const res = await fetch(`${API}/repos/${this.cfg.repo}/contents/results/last_check.json?ref=main&t=${Date.now()}`, { headers: this.headers() });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const content = new TextDecoder().decode(Uint8Array.from(atob(data.content.replace(/\s/g, '')), c => c.charCodeAt(0)));
+      return JSON.parse(content).checked_at || null;
+    } catch (e) { return null; }
+  },
+
+  refreshStatus(msg, isError) {
+    const el = document.getElementById('refresh-status');
+    if (el) { el.textContent = msg; el.style.color = isError ? 'var(--danger)' : 'var(--muted)'; }
+  },
+
+  async refresh() {
+    const btn = document.getElementById('btn-refresh');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Actualizando…'; }
+    this.refreshStatus('');
+    try {
+      const before = await this.fetchCheckedAt();
+      const res = await fetch(`${API}/repos/${this.cfg.repo}/actions/workflows/check.yml/dispatches`, {
+        method: 'POST',
+        headers: { ...this.headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: 'main', inputs: { force: 'true' } }),
+      });
+      if (res.status === 403 || res.status === 404) {
+        this.refreshStatus('Tu token no puede disparar Actions. Necesita scope "workflow" (classic) o "Actions: read/write" (fine-grained).', true);
+        return;
+      }
+      if (res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      this.refreshStatus('Workflow lanzado, esperando resultados…');
+      for (let i = 0; i < 24; i++) {
+        await new Promise(r => setTimeout(r, 8000));
+        const now = await this.fetchCheckedAt();
+        if (now && now !== before) {
+          await this.renderLastDraws();
+          this.refreshStatus('Actualizado ' + new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }));
+          return;
+        }
+      }
+      this.refreshStatus('El chequeo sigue corriendo. Recargá en un rato.', true);
+    } catch (e) {
+      this.refreshStatus('Error: ' + e.message, true);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Actualizar'; }
+    }
   },
 
   tkDateIso(raw) {
